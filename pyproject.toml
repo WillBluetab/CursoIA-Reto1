@@ -1,0 +1,7 @@
+[project]
+name = "reto"
+version = "0.1.0"
+description = "Reto final, construye lo que quieras"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = []

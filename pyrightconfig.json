@@ -1,0 +1,6 @@
+{
+  "//": "Cada clase es su propia raiz: asi imports top-level (from logger import...) resuelven.",
+  "typeCheckingMode": "standard",
+  "reportMissingTypeStubs": false,
+  "reportMissingModuleSource": false
+}
