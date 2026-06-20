@@ -62,7 +62,7 @@ def main() -> None:
     config = ReactConfig(perfil=args.perfil)
 
     logger.info("Ejecutando el agente ReAct")
-    entrada = HumanMessage(content=f"Perfil del viaje:\n{config.perfil}")
+    entrada = HumanMessage(content=f"Información del crédito a obtener:\n{config.perfil}")
     # recursion_limit acota el bucle por si el agente se enreda (cinturón de seguridad).
     resultado = graph.invoke({"messages": [entrada]}, {"recursion_limit": 25})
 

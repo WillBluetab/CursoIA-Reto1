@@ -54,9 +54,6 @@ class TasaResponse(BaseModel):
         description="Plazo sugerido para el financiamiento en meses (ej. 12, 24, 36)",
         ge=1
     )
-    rango_tasa: str = Field(
-        description="Rango de tasas asociado a la decision crediticia, o una descripcion cualitativa del nivel de tasa (ej. Competitiva, Alta, Preferencial)"
-    )
     explicacion: str = Field(
         description="Tasa determinada con base al perfil de riesgo"
     )
@@ -132,6 +129,7 @@ class State(MessagesState):
     # Datos de la oferta de credito
     tasa_anual: float | None
     plazo_meses: int | None
+    renta: int | None
     
     # Evaluacion de riesgo del cliente
     nivel_riesgo: str | None
@@ -143,6 +141,15 @@ class State(MessagesState):
     
     # El uso de Annotated con acumular_historial registra el Reducer en LangGraph
     historial_iteraciones: Annotated[list[dict], acumular_historial]
+
+
+class Auditoria(BaseModel):
+    aprobado: bool = Field(
+        description="True si el mensaje es respetuoso, no invasivo y cumple con el limite de palabras"
+    )
+    motivos: list[str] = Field(
+        description="Lista de motivos de rechazo si el mensaje no es aprobado"
+    )
 
 
 ##########################################
