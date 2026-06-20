@@ -23,11 +23,25 @@ from __future__ import annotations
 from langchain_core.messages import SystemMessage
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
+from langchain_core.messages import SystemMessage, AIMessage
 
 from logger import get_logger
 from prompts import SYSTEM_AGENTE
 from settings import get_llm
-from tools import analizar_lugar, analizar_destino, sugerir_plan, auditar_respeto, TOOLS
+
+from schemas import State, TipoCredito
+
+from tools import (
+    consultar_buro_de_credito, 
+    evaluar_riesgo,  
+    capacidad_de_pago, 
+    calcula_tasa, 
+    calcula_renta, 
+    calcular_monto_maximo_aprobado, 
+    auditar_respeto, 
+    TOOLS
+)
+
 
 logger = get_logger("graph")
 
@@ -38,10 +52,6 @@ logger = get_logger("graph")
 # Reutilizamos MessagesState (de LangGraph): trae un campo `messages` con el
 # reducer add_messages ya configurado, que ACUMULA la conversación (humano,
 # IA, llamadas a tools y sus resultados). Es lo estándar para agentes.
-
-
-class State(MessagesState):
-    pass
 
 
 ###############################################
@@ -72,10 +82,14 @@ def agente(state: State) -> dict:
 def route_tools(state: State):
     """Revisa el último mensaje y decide a qué nodo de herramienta ir, o si termina."""
     ultimo_mensaje = state["messages"][-1]
-    if not ultimo_mensaje.tool_calls:
+    
+    # Verificamos que sea un mensaje de la IA y que tenga llamadas a herramientas
+    if not isinstance(ultimo_mensaje, AIMessage) or not ultimo_mensaje.tool_calls:
         return END
+        
     # Enrutamos al nodo que coincide con el nombre de la herramienta solicitada
     return ultimo_mensaje.tool_calls[0]["name"]
+
 
 
 ##################################################
@@ -87,9 +101,12 @@ def build_graph() -> StateGraph:
     workflow.add_node("agente", agente)
     
     # Añadimos cada herramienta como un nodo independiente
-    workflow.add_node("analizar_lugar", ToolNode([analizar_lugar]))
-    workflow.add_node("analizar_destino", ToolNode([analizar_destino]))
-    workflow.add_node("sugerir_plan", ToolNode([sugerir_plan]))
+    workflow.add_node("consultar_buro_de_credito", ToolNode([consultar_buro_de_credito]))
+    workflow.add_node("evaluar_riesgo", ToolNode([evaluar_riesgo]))
+    workflow.add_node("capacidad_de_pago", ToolNode([capacidad_de_pago]))
+    workflow.add_node("calcula_tasa", ToolNode([calcula_tasa]))
+    workflow.add_node("calcula_renta", ToolNode([calcula_renta]))
+    workflow.add_node("calcular_monto_maximo_aprobado", ToolNode([calcular_monto_maximo_aprobado]))
     workflow.add_node("auditar_respeto", ToolNode([auditar_respeto]))
 
     workflow.add_edge(START, "agente")
@@ -99,18 +116,24 @@ def build_graph() -> StateGraph:
         "agente",
         route_tools,
         {
-            "analizar_lugar": "analizar_lugar",
-            "analizar_destino": "analizar_destino",
-            "sugerir_plan": "sugerir_plan",
+            "consultar_buro_de_credito": "consultar_buro_de_credito",
+            "evaluar_riesgo": "evaluar_riesgo",
+            "capacidad_de_pago": "capacidad_de_pago",
+            "calcula_tasa": "calcula_tasa",
+            "calcula_renta": "calcula_renta",
+            "calcular_monto_maximo_aprobado": "calcular_monto_maximo_aprobado",
             "auditar_respeto": "auditar_respeto",
             END: END
         }
     )
 
     # Cada herramienta vuelve al agente tras completarse para que evalúe el resultado
-    workflow.add_edge("analizar_lugar", "agente")
-    workflow.add_edge("analizar_destino", "agente")
-    workflow.add_edge("sugerir_plan", "agente")
+    workflow.add_edge("consultar_buro_de_credito", "agente")
+    workflow.add_edge("evaluar_riesgo", "agente")
+    workflow.add_edge("capacidad_de_pago", "agente")
+    workflow.add_edge("calcula_tasa", "agente")
+    workflow.add_edge("calcula_renta", "agente")
+    workflow.add_edge("calcular_monto_maximo_aprobado", "agente")
     workflow.add_edge("auditar_respeto", "agente")
 
     return workflow

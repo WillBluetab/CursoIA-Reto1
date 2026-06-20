@@ -1,10 +1,16 @@
 """
 CLI de la clase 5 (ReAct).
 
-    uv run python main.py -p "Le gustaría ir a Mexico"
-    uv run python main.py -p "Quiere ir a la playa" --traza    
-    uv run python main.py -p "Quiere ir a la playa, pero no tiene dinero" --traza
-    uv run langgraph dev   # versión visual del bucle ReAct
+Caso 1: Aprobación directa
+    uv run python main.py -p "RFC: ABC120304XYZ, credito comercial, ingresos: 100000, gastos: 30000, monto: 50000" --traza
+
+Caso 2: Aprobación Ajustada (Capacidad de pago superada)
+    uv run python main.py -p "RFC: KLM030415A12, prestamo operativo, ingresos: 40000, gastos: 25000, monto: 150000" --traza
+
+Caso 3: Rechazo (Riesgo Alto)
+    uv run python main.py -p "RFC: XYZ987654MNO, credito personal, ingresos: 15000, gastos: 10000, monto: 500000" --traza
+
+
 
 Con --traza ves el ciclo completo: qué herramientas pidió el agente, con qué
 argumentos y qué le devolvieron. Es la mejor forma de entender ReAct.cd..
@@ -32,7 +38,7 @@ logger = get_logger("main")
 #################
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Clase 5 — Agente ReAct")
-    parser.add_argument("--perfil", "-p", required=True, help="lugares, actividades y presupuesto")
+    parser.add_argument("--perfil", "-p", required=True, help="RFC, tipo de crédito, ingresos, gastos y monto")
     parser.add_argument(
         "--traza", action="store_true", help="Muestra el ciclo razonar/actuar paso a paso"
     )

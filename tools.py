@@ -293,8 +293,8 @@ def auditar_respeto(mensaje: str, capacidad_pago: float, renta_mensual: float) -
         
     # 2. Validar longitud del mensaje (máximo 100 palabras)
     palabras = mensaje.split()
-    if len(palabras) > 100:
-        motivos.append(f"El mensaje excede el limite de 100 palabras (tiene {len(palabras)} palabras). Redacta una version mas corta.")
+    if len(palabras) > 300:
+        motivos.append(f"El mensaje excede el limite de 300 palabras (tiene {len(palabras)} palabras). Redacta una version mas corta.")
         
     # 3. Validar viabilidad financiera (Guardrail de Capacidad)
     if renta_mensual > capacidad_pago:
@@ -360,7 +360,8 @@ def calcular_monto_maximo_aprobado(capacidad_pago: float, tasa: float, plazo: in
     # Fórmula de valor presente de una anualidad
     monto_maximo = capacidad_pago * (((1 + r)**plazo - 1) / (r * (1 + r)**plazo))
     
-    return round(monto_maximo, 2)
+    #Redondea al millar mas cercano hacia abajo
+    return float(round(monto_maximo // 1000) * 1000)
 
 
 #############################################################################
@@ -372,6 +373,6 @@ TOOLS = [
     capacidad_de_pago,
     calcula_tasa,
     calcula_renta,
-  calcular_monto_maximo_aprobado,     
+    calcular_monto_maximo_aprobado,     
     auditar_respeto
 ]
