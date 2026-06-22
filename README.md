@@ -7,14 +7,15 @@ Este proyecto es un evaluador agentico de riesgo crediticio B2B desarrollado con
 El sistema está diseñado de forma modular con los siguientes nodos y flujo lógico:
 
 ```mermaid
-graph TD;
+graph TD
     __start__([START]) --> clasificar_tipo_credito[clasificar_tipo_credito]
     clasificar_tipo_credito --> agente[agente]
     agente -.->|pide una tool| tools[Tools Node]
     tools --> agente
     agente -.->|propuesta lista| verificar_politicas[verificar_politicas]
-    verificar_politicas -.->|incumple políticas críticas| rechazo_politicas[rechazo_politicas] --> __end__([END])
-    verificar_politicas -.->|cumple políticas| evaluador[evaluador]
+    verificar_politicas -.->|incumple politicas criticas| rechazo_politicas[rechazo_politicas]
+    rechazo_politicas --> __end__([END])
+    verificar_politicas -.->|cumple politicas| evaluador[evaluador]
     evaluador -.->|aprobado / max iteraciones| __end__
     evaluador -.->|no aprobado| agente
 ```
