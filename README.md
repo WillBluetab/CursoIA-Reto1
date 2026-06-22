@@ -122,7 +122,7 @@ En esta gráfica se muestra el desglose del consumo de tokens en cada paso de la
 Muestra el costo financiero individual generado por cada invocación del modelo de lenguaje (`gpt-4o-mini`). El costo de cada llamada se calcula de forma dinámica según la cantidad de tokens consumidos, lo que facilita auditar financieramente qué partes del flujo (por ejemplo, el bucle de optimización o las llamadas del agente ReAct) tienen mayor impacto en el presupuesto.
 
 ### 3. Costo Total de la Invocación
-![Costo total de ejecución](./costo_total.jpg)
+![Costo total de ejecución](./Costo_total.jpg)
 Esta vista consolidada muestra el gasto total en dólares para una corrida completa del grafo de principio a fin. Gracias al uso de `gpt-4o-mini`, el costo total acumulado es extremadamente bajo (típicamente menos de un centavo de dólar por ejecución completa, incluyendo iteraciones de corrección), demostrando la viabilidad económica del sistema para un entorno de producción.
 
 ### 4. Latencia y Tiempos de Respuesta
