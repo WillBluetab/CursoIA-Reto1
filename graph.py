@@ -29,7 +29,7 @@ from logger import get_logger
 from settings import get_llm
 
 from prompts import SYSTEM_AGENTE, SYSTEM_ROUTER, SYSTEM_EVALUADOR
-from schemas import State, TipoCredito, IntentionResponse, EvaluacionPropuesta
+from schemas import State, TipoCredito, ClasificacionCredito, EvaluacionPropuesta
 
 
 
@@ -49,15 +49,15 @@ logger = get_logger("graph")
 
 
 ##############################
-# ---- clasificar_intencion ---- #
+# ---- clasificar_tipo_credito ---- #
 ##############################
-#Clasificamos la intención utilizando el primer mensaje del cliente
+#Clasificamos el tipo de crédito utilizando el primer mensaje del cliente
 
-def clasificar_intencion(state: State) -> dict:
-    logger.info("Router — Clasificando intención y tono del crédito")
+def clasificar_tipo_credito(state: State) -> dict:
+    logger.info("Router — Clasificando tipo de crédito y tono")
     
     # Configuramos el LLM para que retorne obligatoriamente el esquema de Pydantic
-    llm = get_llm(temperature=0.1).with_structured_output(IntentionResponse)
+    llm = get_llm(temperature=0.1).with_structured_output(ClasificacionCredito)
     
     # Tomamos el primer mensaje del usuario (el perfil del cliente)
     mensaje_usuario = state["messages"][0].content
@@ -70,11 +70,12 @@ def clasificar_intencion(state: State) -> dict:
     
     respuesta = llm.invoke(mensajes)
     
-    # Retornamos el diccionario que actualizará los campos 'intencion' y 'tono' en el State
+    # Retornamos el diccionario que actualizará los campos 'tipo_credito' y 'tono' en el State
     return {
-        "intencion": respuesta.intencion,
+        "tipo_credito": respuesta.tipo_credito,
         "tono": respuesta.tono
     }
+
 
 
 ###############################################
@@ -89,20 +90,38 @@ def _llm_con_tools():
 
 ##########################################################################
 # ---- Nodo agente: razona y, si hace falta, pide llamar a una tool ---- #
+# Cambie la forma en que hacemos el agente, para que al momento de pintar me de mas información
 ##########################################################################
 def agente(state: State) -> dict:
-    logger.info("Agente — razonando sobre el siguiente paso")
+    # 1. Determinar un log dinámico según el último mensaje recibido
+    if not state["messages"]:
+        detalle = "iniciando análisis del caso"
+    else:
+        ultimo = state["messages"][-1]
+        if isinstance(ultimo, ToolMessage):
+            # Muestra sobre qué herramienta acaba de recibir datos
+            detalle = f"analizando resultado de la herramienta '{ultimo.name}'"
+        elif isinstance(ultimo, HumanMessage):
+            # Si el último mensaje contiene la palabra 'Retroalimentación', está en refinamiento
+            if "Retroalimentación" in ultimo.content:
+                detalle = f"optimizando propuesta (Iteración {state.get('iteraciones', 0) + 1})"
+            else:
+                detalle = "iniciando evaluación del perfil del cliente"
+        else:
+            detalle = "razonando sobre el siguiente paso"
+
+    logger.info(f"Agente — {detalle}")
     
-    # Extraemos la clasificación previa del State
-    intencion = state.get("intencion")
+    # 2. Flujo normal de ejecución
+    tipo_credito = state.get("tipo_credito")
     tono = state.get("tono")
     
-    # Inyectamos esta información como contexto adicional
-    contexto_adicional = f"\n\n[CONTEXTO DE LA EVALUACIÓN]\n- Tipo de crédito clasificado: {intencion}\n- Tono asignado para la redacción: {tono}\nAsegúrate de utilizar estas especificaciones en tu análisis y redacción final."
+    contexto_adicional = f"\n\n[CONTEXTO DE LA EVALUACIÓN]\n- Tipo de crédito clasificado: {tipo_credito}\n- Tono asignado para la redacción: {tono}\nAsegúrate de utilizar estas especificaciones en tu análisis y redacción final."
     
     mensajes = [SystemMessage(content=SYSTEM_AGENTE + contexto_adicional)] + state["messages"]
     respuesta = _llm_con_tools().invoke(mensajes)
     return {"messages": [respuesta]}
+
 
 
 
@@ -129,7 +148,7 @@ def build_graph() -> StateGraph:
     workflow = StateGraph(State)
 
     # 1. Registramos el nuevo nodo clasificador y el agente
-    workflow.add_node("clasificar_intencion", clasificar_intencion)
+    workflow.add_node("clasificar_tipo_credito", clasificar_tipo_credito)
     workflow.add_node("agente", agente)
     workflow.add_node("evaluador", evaluador)
     workflow.add_node("verificar_politicas", verificar_politicas)
@@ -145,8 +164,8 @@ def build_graph() -> StateGraph:
     workflow.add_node("auditar_respeto", ToolNode([auditar_respeto]))
 
     # 2. Modificamos el inicio del flujo
-    workflow.add_edge(START, "clasificar_intencion")  # START ahora va al Router
-    workflow.add_edge("clasificar_intencion", "agente") # El Router pasa el flujo al agente
+    workflow.add_edge(START, "clasificar_tipo_credito")  # START ahora va al Router
+    workflow.add_edge("clasificar_tipo_credito", "agente") # El Router pasa el flujo al agente
 
     # Mapeamos la arista condicional para redirigir al nodo correcto de herramienta
     workflow.add_conditional_edges(
@@ -293,8 +312,8 @@ def verificar_politicas(state: State) -> dict:
     violaciones = []
     if score is not None and score < 500:
         violaciones.append(f"Score de buró de crédito insuficiente ({score} < 500)")
-    if ratio > 0.50:
-        violaciones.append(f"Ratio de endeudamiento excesivo ({ratio*100:.1f}% > 50.0%)")
+    if ratio > 0.65:
+        violaciones.append(f"Ratio de endeudamiento excesivo ({ratio*100:.1f}% > 65.0%)")
         
     if violaciones:
         logger.warning(f"Políticas de riesgo violadas: {', '.join(violaciones)}")
@@ -333,8 +352,8 @@ def rechazo_politicas(state: State) -> dict:
     
     if state.get("score_buro") and state["score_buro"] < 500:
         mensaje_rechazo += f"- Score de buró de crédito por debajo del mínimo requerido ({state['score_buro']} < 500).\n"
-    if state.get("ratio_endeudamiento") and state["ratio_endeudamiento"] > 0.50:
-        mensaje_rechazo += f"- Ratio de endeudamiento superior al límite del 50% ({state['ratio_endeudamiento']*100:.1f}%).\n"
+    if state.get("ratio_endeudamiento") and state["ratio_endeudamiento"] > 0.65:
+        mensaje_rechazo += f"- Ratio de endeudamiento superior al límite del 65% ({state['ratio_endeudamiento']*100:.1f}%).\n"
         
     return {"messages": [AIMessage(content=mensaje_rechazo)]}
 

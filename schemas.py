@@ -58,8 +58,8 @@ class TasaResponse(BaseModel):
         description="Tasa determinada con base al perfil de riesgo"
     )
 
-class IntentionResponse(BaseModel):
-    intencion: TipoCredito = Field(
+class ClasificacionCredito(BaseModel):
+    tipo_credito: TipoCredito = Field(
         description="Clasificacion del tipo de credito solicitado a partir de los datos ingresados"
     )
     justificacion: str = Field(
@@ -68,6 +68,7 @@ class IntentionResponse(BaseModel):
     tono: str = Field(
         description="Estilo de redaccion y directrices de tono recomendadas para la propuesta (ej. conservador, flexible, corporativo)"
     )
+
 
 
 class EvaluacionPropuesta(BaseModel):
@@ -117,7 +118,7 @@ def acumular_historial(left: list[dict] | None, right: list[dict] | dict | None)
 
 class State(MessagesState):
     # Datos de la solicitud
-    intencion: TipoCredito | None
+    tipo_credito: TipoCredito | None
     tono: str | None
     
     # Datos del cliente obtenidos por las herramientas
