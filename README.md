@@ -106,6 +106,27 @@ Para visualizar el grafo de forma interactiva y probar el flujo de nodos y estad
 ```bash
 uv run langgraph dev
 ```
+---
+
+## Observabilidad y Métricas (LangSmith)
+
+El comportamiento de nuestro agente inteligente está totalmente monitoreado mediante la plataforma **LangSmith**. Esto nos permite analizar a detalle el rendimiento, consumo y costo del flujo. A continuación se presentan las métricas obtenidas durante una ejecución completa (Caso de aprobación con ajuste de monto):
+
+### 1. Trazabilidad y Consumo de Tokens por Nodo
+![Traza de consumo de tokens](./tokens_trace.jpg)
+En esta gráfica se muestra el desglose del consumo de tokens en cada paso de la ejecución. Cada llamada a la API (clasificación inicial, las llamadas del agente ReAct y el nodo de evaluación) registra con precisión los tokens de entrada (prompt) y de salida (completion), permitiendo identificar cuellos de botella y optimizar la extensión de los prompts.
+
+### 2. Desglose de Costo en la Traza de Ejecución
+![Costo detallado por paso](./costo_trace.jpg)
+Muestra el costo financiero individual generado por cada invocación del modelo de lenguaje (`gpt-4o-mini`). El costo de cada llamada se calcula de forma dinámica según la cantidad de tokens consumidos, lo que facilita auditar financieramente qué partes del flujo (por ejemplo, el bucle de optimización o las llamadas del agente ReAct) tienen mayor impacto en el presupuesto.
+
+### 3. Costo Total de la Invocación
+![Costo total de ejecución](./costo_total.jpg)
+Esta vista consolidada muestra el gasto total en dólares para una corrida completa del grafo de principio a fin. Gracias al uso de `gpt-4o-mini`, el costo total acumulado es extremadamente bajo (típicamente menos de un centavo de dólar por ejecución completa, incluyendo iteraciones de corrección), demostrando la viabilidad económica del sistema para un entorno de producción.
+
+### 4. Latencia y Tiempos de Respuesta
+![Latencia de la ejecución](./latencia.jpg)
+Representa la duración en segundos de toda la ejecución del flujo de decisiones. Permite observar el tiempo que tarda cada nodo del grafo en resolver (las llamadas al LLM frente a las funciones deterministas en Python), ayudando a garantizar que los tiempos de respuesta cumplan con los Acuerdos de Nivel de Servicio (SLA) exigidos por la institución financiera.
 
 ---
 
@@ -123,7 +144,23 @@ uv run langgraph dev
    Se utiliza tipado completo y validaciones robustas con Pydantic. Cada dato clave en el estado, así como el retorno de las herramientas, está estructurado con tipos nativos de Python y modelos Pydantic, eliminando el uso de `Any`.
 
 3. **Guardrails de Código (Cinturón de Seguridad):**
-   Las reglas críticas de riesgo institucional (score de buró < 500 o ratio de endeudamiento > 65%) se validan en un nodo determinista programado en Python puro. Si se violan estas condiciones, el sistema desvía el flujo inmediatamente a un nodo de rechazo, evitando consumir llamadas al LLM o al evaluador.
+    Las reglas críticas de riesgo institucional (score de buró < 500 o ratio de endeudamiento > 65%) se validan en un nodo determinista programado en Python puro. Si se violan estas condiciones, el sistema desvía el flujo inmediatamente a un nodo de rechazo, evitando consumir llamadas al LLM o al evaluador.
+
+## Técnicas de Prompting Utilizadas
+
+En el desarrollo de este agente inteligente se aplicaron de forma consciente las siguientes técnicas de Prompting:
+
+1. **Few-Shot Prompting (Ejemplos Guiados):**
+   * **Dónde se aplica:** En el prompt del agente (`SYSTEM_AGENTE` en `prompts.py`).
+   * **Por qué y cómo:** Proporcionamos un ejemplo estructurado y detallado del reporte que debe generar para el ejecutivo de cuenta (mostrando el RFC, score de buró, capacidad de pago, tasas, mensualidades y justificaciones). Esto guía al modelo para estructurar el reporte de forma consistente y uniforme, hice esto porque cada vez que probaba cambiaba la salida y considero importante que los ejecutivos tenga TODA la información y que tenga siempre la misma estructura para que ellos se acostumbren y puedan consultarla de un solo vistazo sin perder tiempo teniendo que leer todo el contenido.
+
+2. **Chain-of-Thought Prompting (Razonamiento Paso a Paso):**
+   * **Dónde se aplica:** En el prompt del agente ReAct (`SYSTEM_AGENTE` en `prompts.py`).
+   * **Por qué y cómo:** Indicamos al modelo: *"Sigue estrictamente este protocolo de ejecucion..."* y *"Razona brevemente antes de cada accion"*. Esto obliga al agente a descomponer el problema financiero en pasos lógicos consecutivos (razonamiento sobre el buró de crédito, análisis de riesgo, evaluación de capacidad y cotización), evitando errores aritméticos y asegurando que las decisiones estén fundamentadas.
+
+3. **Zero-Shot Prompting (Directivas sin Ejemplos):**
+   * **Dónde se aplica:** En el router de entrada (`SYSTEM_ROUTER`) y en el auditor (`SYSTEM_EVALUADOR`).
+   * **Por qué y cómo:** Ambos componentes operan bajo una estructura de salida Pydantic rígida (`with_structured_output`). Al router se le definen las reglas categóricas de clasificación (`credito_comercial`, `prestamo_operativo`, `linea_revolvente`) y al evaluador se le definen los 4 criterios de la rúbrica (Coherencia Financiera, Claridad, Tono y Gestión de Riesgo), permitiendo que resuelvan la clasificación y auditoría de forma directa basándose únicamente en las definiciones conceptuales sin necesidad de ejemplos previos.
 
 ## La Parte Más Difícil y Cómo se Resolvió
 
