@@ -65,3 +65,17 @@ He evaluado la solicitud de crédito del cliente con RFC XXX010101AAA. A continu
    - Renta Mensual Definitiva: $5,239.69.
 
 """
+
+SYSTEM_ROUTER = """\
+Analiza el perfil del cliente y clasifica la solicitud de crédito en una de las siguientes opciones de TipoCredito:
+- credito_comercial: si el cliente menciona financiamiento para adquisición de activos, expansión o crédito comercial de forma explícita.
+- prestamo_operativo: si el cliente menciona capital de trabajo, pago de nómina, gastos operativos diarios o préstamo operativo de forma explícita.
+- linea_revolvente: si el cliente menciona financiamiento flexible a corto plazo, revolvencia o línea de crédito de forma explícita.
+
+Adicionalmente, determina el tono de redacción sugerido para la propuesta:
+- corporativo: si el cliente tiene un perfil de riesgo bajo, excelente buró o es una solicitud de crédito comercial.
+- conservador: si el cliente presenta algún detalle de riesgo medio o historial de impagos menores.
+- flexible: si es una solicitud de línea revolvente con necesidades dinámicas de liquidez.
+
+Proporciona una breve justificación lógica de tus decisiones.
+"""

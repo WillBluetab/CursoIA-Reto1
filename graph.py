@@ -20,7 +20,7 @@ El bucle agente → tools → agente es el corazón del patrón ReAct.
 
 from __future__ import annotations
 
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
 from langgraph.graph import END, START, MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode
 from langchain_core.messages import SystemMessage, AIMessage
@@ -29,7 +29,9 @@ from logger import get_logger
 from prompts import SYSTEM_AGENTE
 from settings import get_llm
 
-from schemas import State, TipoCredito
+from prompts import SYSTEM_AGENTE, SYSTEM_ROUTER
+from schemas import State, TipoCredito, IntentionResponse
+
 
 from tools import (
     consultar_buro_de_credito, 
@@ -47,11 +49,32 @@ logger = get_logger("graph")
 
 
 ##############################
-# ---- Estado del grafo ---- #
+# ---- clasificar_intencion ---- #
 ##############################
-# Reutilizamos MessagesState (de LangGraph): trae un campo `messages` con el
-# reducer add_messages ya configurado, que ACUMULA la conversación (humano,
-# IA, llamadas a tools y sus resultados). Es lo estándar para agentes.
+#Clasificamos la intención utilizando el primer mensaje del cliente
+
+def clasificar_intencion(state: State) -> dict:
+    logger.info("Router — Clasificando intención y tono del crédito")
+    
+    # Configuramos el LLM para que retorne obligatoriamente el esquema de Pydantic
+    llm = get_llm(temperature=0.1).with_structured_output(IntentionResponse)
+    
+    # Tomamos el primer mensaje del usuario (el perfil del cliente)
+    mensaje_usuario = state["messages"][0].content
+    
+    # Armamos la consulta al modelo
+    mensajes = [
+        SystemMessage(content=SYSTEM_ROUTER),
+        HumanMessage(content=f"Perfil del cliente a analizar:\n{mensaje_usuario}")
+    ]
+    
+    respuesta = llm.invoke(mensajes)
+    
+    # Retornamos el diccionario que actualizará los campos 'intencion' y 'tono' en el State
+    return {
+        "intencion": respuesta.intencion,
+        "tono": respuesta.tono
+    }
 
 
 ###############################################
@@ -69,11 +92,18 @@ def _llm_con_tools():
 ##########################################################################
 def agente(state: State) -> dict:
     logger.info("Agente — razonando sobre el siguiente paso")
-    # Anteponemos el system prompt a la conversación acumulada.
-    mensajes = [SystemMessage(content=SYSTEM_AGENTE)] + state["messages"]
+    
+    # Extraemos la clasificación previa del State
+    intencion = state.get("intencion")
+    tono = state.get("tono")
+    
+    # Inyectamos esta información como contexto adicional
+    contexto_adicional = f"\n\n[CONTEXTO DE LA EVALUACIÓN]\n- Tipo de crédito clasificado: {intencion}\n- Tono asignado para la redacción: {tono}\nAsegúrate de utilizar estas especificaciones en tu análisis y redacción final."
+    
+    mensajes = [SystemMessage(content=SYSTEM_AGENTE + contexto_adicional)] + state["messages"]
     respuesta = _llm_con_tools().invoke(mensajes)
-    # add_messages añade la respuesta (que puede incluir tool_calls) al estado.
     return {"messages": [respuesta]}
+
 
 
 ######################################################
@@ -98,6 +128,8 @@ def route_tools(state: State):
 def build_graph() -> StateGraph:
     workflow = StateGraph(State)
 
+    # 1. Registramos el nuevo nodo clasificador y el agente
+    workflow.add_node("clasificar_intencion", clasificar_intencion)
     workflow.add_node("agente", agente)
     
     # Añadimos cada herramienta como un nodo independiente
@@ -109,7 +141,9 @@ def build_graph() -> StateGraph:
     workflow.add_node("calcular_monto_maximo_aprobado", ToolNode([calcular_monto_maximo_aprobado]))
     workflow.add_node("auditar_respeto", ToolNode([auditar_respeto]))
 
-    workflow.add_edge(START, "agente")
+    # 2. Modificamos el inicio del flujo
+    workflow.add_edge(START, "clasificar_intencion")  # START ahora va al Router
+    workflow.add_edge("clasificar_intencion", "agente") # El Router pasa el flujo al agente
 
     # Mapeamos la arista condicional para redirigir al nodo correcto de herramienta
     workflow.add_conditional_edges(
