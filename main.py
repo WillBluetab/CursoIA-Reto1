@@ -10,7 +10,8 @@ Caso 2: Aprobación Ajustada (Capacidad de pago superada)
 Caso 3: Rechazo (Riesgo Alto)
     uv run python main.py -p "RFC: XYZ987654MNO, credito personal, ingresos: 15000, gastos: 10000, monto: 500000" --traza
 
-
+Caso langchain:
+    uv run langgraph dev
 
 Con --traza ves el ciclo completo: qué herramientas pidió el agente, con qué
 argumentos y qué le devolvieron. Es la mejor forma de entender ReAct.cd..
@@ -70,7 +71,8 @@ def main() -> None:
     logger.info("Ejecutando el agente ReAct")
     entrada = HumanMessage(content=f"Información del crédito a obtener:\n{config.perfil}")
     # recursion_limit acota el bucle por si el agente se enreda (cinturón de seguridad).
-    resultado = graph.invoke({"messages": [entrada]}, {"recursion_limit": 25})
+    # Aumenté el iimite de recursion, ya que 25 en las pruebas se quedo corto. ya que cada llamada a las herramientas cuenta y conforme se agregan cosas gasto mas
+    resultado = graph.invoke({"messages": [entrada]}, {"recursion_limit": 60})
 
     if args.traza:
         _imprimir_traza(resultado["messages"])

@@ -79,3 +79,13 @@ Adicionalmente, determina el tono de redacción sugerido para la propuesta:
 
 Proporciona una breve justificación lógica de tus decisiones.
 """
+SYSTEM_EVALUADOR = """\
+Eres un auditor y evaluador experto de propuestas de crédito B2B. Tu trabajo es calificar la propuesta final redactada por el ejecutivo de cuenta utilizando la siguiente rúbrica (califica cada criterio del 0.0 al 10.0):
+1. **Coherencia Financiera**: ¿Las condiciones financieras sugeridas (monto, tasa, plazo, renta mensual) son acordes y viables según el perfil financiero y de riesgo del cliente?
+2. **Claridad y Estructura**: ¿La propuesta redactada para el cliente y para el ejecutivo es clara, profesional, sin ambigüedades y bien estructurada?
+3. **Adecuación de Tono**: ¿El tono utilizado en los mensajes se adecua correctamente al tipo de crédito y a las recomendaciones de tono (corporativo, conservador, flexible)?
+4. **Gestión de Riesgo**: ¿La propuesta mitiga adecuadamente el riesgo financiero según los datos del buró y capacidad de pago?
+Criterios de Aprobación:
+- El promedio matemático de los 4 criterios debe ser mayor o igual a 8.0 para marcar 'aprobado' como True.
+- Si el promedio es menor a 8.0, 'aprobado' debe ser False y debes proporcionar una retroalimentación constructiva específica y detallada en el campo 'feedback' indicando qué corregir.
+"""
