@@ -106,3 +106,33 @@ Para visualizar el grafo de forma interactiva y probar el flujo de nodos y estad
 ```bash
 uv run langgraph dev
 ```
+
+---
+
+## Decisiones de Diseño
+
+1. **Separación de Responsabilidades (Modularidad):**
+   Toda la lógica se dividió en archivos específicos para facilitar el mantenimiento y cumplir las buenas prácticas de producción:
+   - `schemas.py`: Define de forma estricta los tipos de datos y los contratos Pydantic.
+   - `tools.py`: Contiene las herramientas de cálculo financiero y consulta externa (score de buró, capacidad de pago, cotización y reducción de montos).
+   - `prompts.py`: Concentra los templates de prompts del sistema (router, agente, evaluador).
+   - `graph.py`: Define el estado, las transiciones y compila el flujo con LangGraph.
+   - `main.py`: Punto de entrada de la interfaz de consola.
+
+2. **Tipado Estricto y Pydantic:**
+   Se utiliza tipado completo y validaciones robustas con Pydantic. Cada dato clave en el estado, así como el retorno de las herramientas, está estructurado con tipos nativos de Python y modelos Pydantic, eliminando el uso de `Any`.
+
+3. **Guardrails de Código (Cinturón de Seguridad):**
+   Las reglas críticas de riesgo institucional (score de buró < 500 o ratio de endeudamiento > 65%) se validan en un nodo determinista programado en Python puro. Si se violan estas condiciones, el sistema desvía el flujo inmediatamente a un nodo de rechazo, evitando consumir llamadas al LLM o al evaluador.
+
+## La Parte Más Difícil y Cómo se Resolvió
+
+La mayor dificultad técnica del desarrollo fue el **bucle Evaluator-Optimizer interactuando con el Agente ReAct** en múltiples ciclos de corrección. Cuando el evaluador rechazaba una propuesta (promedio de criterios < 8.0), el agente debía retomar la tarea y corregir el borrador inicial. Esto generaba dos problemas:
+1. **Límites de Recursión en LangGraph:** Cada reintento implicaba que el agente ejecutara múltiples pasos internos (razonamiento + llamada a herramientas + observación), lo que agotaba rápidamente el límite predeterminado de recursión de LangGraph (25).
+2. **Contexto de Corrección:** El agente necesitaba conocer el feedback del evaluador para refinar los cálculos financieros y el texto sin perder la consistencia ni entrar en un bucle infinito.
+
+**Solución Implementada:**
+1. Se ajustó el parámetro `recursion_limit` a 60 al invocar el grafo (`app.invoke`), lo que proporciona suficiente espacio para hasta 3 iteraciones completas del ciclo de evaluación y optimización.
+2. Se diseñó un acumulador de feedback en el estado del grafo (`feedback_historial`) mediante un reducer. De esta forma, el evaluador guarda sus observaciones en una lista histórica.
+3. El prompt del agente fue configurado para recibir y procesar dinámicamente este historial. Al reescribir la propuesta, el agente lee las observaciones anteriores, ejecuta de nuevo las herramientas de cálculo si es necesario y afina el contenido hasta cumplir la rúbrica institucional.
+
